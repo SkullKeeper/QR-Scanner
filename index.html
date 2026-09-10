@@ -285,7 +285,8 @@
       }
 
       #sheet-url,
-      #column-header {
+      #column-header,
+      #tab-name {
         width: 100%;
         background: var(--panel-raised);
         border: 1px solid var(--border);
@@ -297,7 +298,8 @@
       }
 
       #sheet-url::placeholder,
-      #column-header::placeholder {
+      #column-header::placeholder,
+      #tab-name::placeholder {
         color: var(--muted);
       }
 
@@ -437,6 +439,14 @@
               id="sheet-url"
               placeholder="https://docs.google.com/spreadsheets/d/..."
             />
+            <label class="field-label" for="tab-name"
+              >Sheet/tab name (as shown at the bottom of Google Sheets)</label
+            >
+            <input
+              type="text"
+              id="tab-name"
+              placeholder="e.g. Form Responses 1"
+            />
             <label class="field-label" for="column-header"
               >Column header to match on</label
             >
@@ -501,6 +511,7 @@
         saveBtn: document.getElementById("save-btn"),
         saveStatus: document.getElementById("save-status"),
         sheetUrl: document.getElementById("sheet-url"),
+        tabName: document.getElementById("tab-name"),
         columnHeader: document.getElementById("column-header"),
         sheetLoadBtn: document.getElementById("sheet-load-btn"),
         sheetStatus: document.getElementById("sheet-status"),
@@ -588,6 +599,14 @@
         } catch (e) {
           // no saved column preference yet
         }
+        try {
+          const res = await window.storage.get("qr-sheet-tab");
+          if (res && res.value) {
+            els.tabName.value = res.value;
+          }
+        } catch (e) {
+          // no saved tab name yet
+        }
         updateCounts();
       }
 
@@ -634,11 +653,11 @@
         saveHistory();
       }
 
-      function sheetCsvUrlFrom(input) {
+      function sheetCsvUrlFrom(input, tabName) {
         const trimmed = input.trim();
         if (!trimmed) return null;
 
-        // Already a direct export/gviz CSV url
+        // Already a direct export/gviz CSV url — use as-is.
         if (/\/export\?format=csv|gviz\/tq\?tqx=out:csv/.test(trimmed)) {
           return trimmed;
         }
@@ -647,9 +666,16 @@
         if (!idMatch) return null;
         const sheetId = idMatch[1];
 
+        // If a tab name was given, target it by name — this is reliable even when
+        // the tab isn't the first one (e.g. Google Form "Form Responses 1" sheets).
+        const name = (tabName || "").trim();
+        if (name) {
+          return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
+        }
+
+        // Otherwise fall back to gid from the URL (or 0, the first tab).
         const gidMatch = trimmed.match(/[#&]gid=([0-9]+)/);
         const gid = gidMatch ? gidMatch[1] : "0";
-
         return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
       }
 
@@ -696,7 +722,7 @@
       }
 
       async function loadFromSheet() {
-        const csvUrl = sheetCsvUrlFrom(els.sheetUrl.value);
+        const csvUrl = sheetCsvUrlFrom(els.sheetUrl.value, els.tabName.value);
         if (!csvUrl) {
           els.sheetStatus.textContent =
             "That doesn't look like a valid Google Sheet URL.";
@@ -757,11 +783,12 @@
           await window.storage.set("qr-valid-codes", JSON.stringify(codes));
           await window.storage.set("qr-sheet-url", els.sheetUrl.value.trim());
           await window.storage.set("qr-sheet-column", wantedHeader);
+          await window.storage.set("qr-sheet-tab", els.tabName.value.trim());
           updateCounts();
           els.sheetStatus.textContent = `Loaded ${codes.length} code${codes.length === 1 ? "" : "s"} from "${wantedHeader}".`;
         } catch (e) {
           els.sheetStatus.textContent =
-            'Could not load the sheet. Make sure it\'s shared as "Anyone with the link — Viewer".';
+            'Could not load the sheet. Make sure it\'s shared as "Anyone with the link — Viewer", and that the tab name (if set) matches exactly.';
         } finally {
           els.sheetLoadBtn.disabled = false;
         }
