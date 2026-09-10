@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>QR Check</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root {
+    --bg: #0F1720;
+    --panel: #16212C;
+    --panel-raised: #1C2A38;
+    --border: #263544;
+    --text: #E7EDF3;
+    --muted: #7E8FA3;
+    --teal: #2DD4BF;
+    --teal-dim: #1B4A46;
+    --green: #34D399;
+    --green-dim: #123527;
+    --red: #F87171;
+    --red-dim: #3B1B1B;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px 64px;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  header h1 {
+    font-size: 19px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+
+  header span {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .scan-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+  }
+
+  #reader-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #0A1119;
+  }
+
+  #reader {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  #reader video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+  }
+
+  #reader img { display: none !important; }
+
+  .idle-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    color: var(--muted);
+    font-size: 14px;
+    text-align: center;
+    padding: 24px;
+  }
+
+  .idle-state svg { opacity: 0.5; }
+
+  .scan-frame {
+    position: absolute;
+    inset: 14%;
+    border: 2px solid var(--teal);
+    border-radius: 14px;
+    pointer-events: none;
+    box-shadow: 0 0 0 999px rgba(10, 17, 25, 0.28);
+  }
+
+  .scan-frame::before, .scan-frame::after {
+    content: "";
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-color: var(--teal);
+  }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 10px;
+    border: none;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: transform 0.08s ease, opacity 0.15s ease;
+  }
+
+  button:active { transform: scale(0.97); }
+
+  .btn-primary {
+    background: var(--teal);
+    color: #06201C;
+    flex: 1;
+  }
+
+  .btn-stop {
+    background: var(--panel-raised);
+    color: var(--text);
+    border: 1px solid var(--border);
+    flex: 1;
+  }
+
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .result {
+    border-radius: 14px;
+    padding: 16px 18px;
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .result.show { display: flex; }
+
+  .result.match {
+    background: var(--green-dim);
+    border-color: rgba(52, 211, 153, 0.35);
+  }
+
+  .result.no-match {
+    background: var(--red-dim);
+    border-color: rgba(248, 113, 113, 0.35);
+  }
+
+  .result-label {
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  .result.match .result-label { color: var(--green); }
+  .result.no-match .result-label { color: var(--red); }
+
+  .result-value {
+    font-size: 13px;
+    color: var(--muted);
+    word-break: break-all;
+  }
+
+  details {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  summary {
+    padding: 14px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    list-style: none;
+  }
+
+  summary::-webkit-details-marker { display: none; }
+
+  .summary-count {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 13px;
+  }
+
+  .list-body {
+    padding: 0 16px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .list-hint {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 130px;
+    background: var(--panel-raised);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 13px;
+    padding: 12px;
+    resize: vertical;
+  }
+
+  .save-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .sheet-source {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #sheet-url {
+    width: 100%;
+    background: var(--panel-raised);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 11px 12px;
+  }
+
+  #sheet-url::placeholder { color: var(--muted); }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .checkbox-row input { accent-color: var(--teal); }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 12px;
+    margin: 2px 0;
+  }
+
+  .divider::before, .divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .btn-save {
+    background: var(--teal);
+    color: #06201C;
+  }
+
+  .save-status {
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .history {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .history-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--panel-raised);
+    border-radius: 10px;
+    font-size: 12.5px;
+  }
+
+  .history-item .code {
+    color: var(--text);
+    word-break: break-all;
+  }
+
+  .history-item .tag {
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+
+  .history-item.match .tag { color: var(--green); }
+  .history-item.no-match .tag { color: var(--red); }
+
+  .empty {
+    font-size: 13px;
+    color: var(--muted);
+    padding: 4px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>QR Check</h1>
+    <span id="list-status">0 codes loaded</span>
+  </header>
+
+  <div class="scan-card">
+    <div id="reader-wrap">
+      <div id="reader"></div>
+      <div class="idle-state" id="idle-state">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2v2h-2zM14 19h2v2h-2zM19 19h2v2h-2z"/></svg>
+        <span>Camera is off. Start scanning to check a code against your list.</span>
+      </div>
+      <div class="scan-frame" id="scan-frame" style="display:none;"></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn-primary" id="start-btn">Start scanning</button>
+      <button class="btn-stop" id="stop-btn" style="display:none;">Stop</button>
+    </div>
+  </div>
+
+  <div class="result" id="result">
+    <div class="result-label" id="result-label"></div>
+    <div class="result-value" id="result-value"></div>
+  </div>
+
+  <details id="list-panel">
+    <summary>
+      Manage list
+      <span class="summary-count" id="panel-count">0 codes</span>
+    </summary>
+    <div class="list-body">
+      <div class="sheet-source">
+        <p class="list-hint">Load from a Google Sheet: File &rarr; Share &rarr; "Anyone with the link" (Viewer), then paste the sheet URL below. Codes are read from column A.</p>
+        <input type="text" id="sheet-url" placeholder="https://docs.google.com/spreadsheets/d/..." />
+        <label class="checkbox-row">
+          <input type="checkbox" id="skip-header" checked />
+          <span>First row is a header, skip it</span>
+        </label>
+        <div class="save-row">
+          <button class="btn-save" id="sheet-load-btn">Load from sheet</button>
+          <span class="save-status" id="sheet-status"></span>
+        </div>
+      </div>
+      <div class="divider"><span>or edit directly</span></div>
+      <p class="list-hint">One code per line. A scan counts as a match if it exactly matches a line here (case-insensitive, extra spaces ignored).</p>
+      <textarea id="list-input" placeholder="ABC123&#10;TICKET-0042&#10;https://example.com/ticket/9"></textarea>
+      <div class="save-row">
+        <button class="btn-save" id="save-btn">Save list</button>
+        <span class="save-status" id="save-status"></span>
+      </div>
+    </div>
+  </details>
+
+  <details id="history-panel">
+    <summary>
+      Scan history
+      <span class="summary-count" id="history-count">0</span>
+    </summary>
+    <div class="list-body">
+      <div class="history" id="history-list">
+        <p class="empty">No scans yet.</p>
+      </div>
+    </div>
+  </details>
+</div>
+
+<script>
+let validCodes = [];
+let scanHistory = [];
+let html5QrCode = null;
+let scanning = false;
+let lastResultAt = 0;
+
+const els = {
+  startBtn: document.getElementById('start-btn'),
+  stopBtn: document.getElementById('stop-btn'),
+  idleState: document.getElementById('idle-state'),
+  scanFrame: document.getElementById('scan-frame'),
+  result: document.getElementById('result'),
+  resultLabel: document.getElementById('result-label'),
+  resultValue: document.getElementById('result-value'),
+  listInput: document.getElementById('list-input'),
+  saveBtn: document.getElementById('save-btn'),
+  saveStatus: document.getElementById('save-status'),
+  sheetUrl: document.getElementById('sheet-url'),
+  skipHeader: document.getElementById('skip-header'),
+  sheetLoadBtn: document.getElementById('sheet-load-btn'),
+  sheetStatus: document.getElementById('sheet-status'),
+  listStatus: document.getElementById('list-status'),
+  panelCount: document.getElementById('panel-count'),
+  historyCount: document.getElementById('history-count'),
+  historyList: document.getElementById('history-list'),
+};
+
+function normalize(s) {
+  return s.trim().toLowerCase();
+}
+
+function parseList(text) {
+  return text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+}
+
+function updateCounts() {
+  const n = validCodes.length;
+  els.listStatus.textContent = `${n} code${n === 1 ? '' : 's'} loaded`;
+  els.panelCount.textContent = `${n} code${n === 1 ? '' : 's'}`;
+  els.historyCount.textContent = scanHistory.length;
+}
+
+function renderHistory() {
+  if (scanHistory.length === 0) {
+    els.historyList.innerHTML = '<p class="empty">No scans yet.</p>';
+    return;
+  }
+  els.historyList.innerHTML = scanHistory.slice(0, 25).map(h => `
+    <div class="history-item ${h.match ? 'match' : 'no-match'}">
+      <span class="code">${escapeHtml(h.code)}</span>
+      <span class="tag">${h.match ? 'MATCH' : 'NO MATCH'}</span>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+async function loadList() {
+  try {
+    const res = await window.storage.get('qr-valid-codes');
+    if (res && res.value) {
+      const saved = JSON.parse(res.value);
+      validCodes = saved;
+      els.listInput.value = saved.join('\n');
+    }
+  } catch (e) {
+    // no saved list yet
+  }
+  try {
+    const res = await window.storage.get('qr-scan-history');
+    if (res && res.value) {
+      scanHistory = JSON.parse(res.value);
+      renderHistory();
+    }
+  } catch (e) {
+    // no history yet
+  }
+  try {
+    const res = await window.storage.get('qr-sheet-url');
+    if (res && res.value) {
+      els.sheetUrl.value = res.value;
+    }
+  } catch (e) {
+    // no saved sheet url yet
+  }
+  updateCounts();
+}
+
+async function saveList() {
+  const codes = parseList(els.listInput.value);
+  validCodes = codes;
+  try {
+    await window.storage.set('qr-valid-codes', JSON.stringify(codes));
+    els.saveStatus.textContent = 'Saved.';
+  } catch (e) {
+    els.saveStatus.textContent = 'Could not save — list will still work this session.';
+  }
+  updateCounts();
+  setTimeout(() => { els.saveStatus.textContent = ''; }, 2500);
+}
+
+async function saveHistory() {
+  try {
+    await window.storage.set('qr-scan-history', JSON.stringify(scanHistory.slice(0, 50)));
+  } catch (e) {
+    // ignore
+  }
+}
+
+function showResult(code) {
+  const isMatch = validCodes.some(c => normalize(c) === normalize(code));
+
+  els.result.classList.remove('match', 'no-match');
+  els.result.classList.add('show', isMatch ? 'match' : 'no-match');
+  els.resultLabel.textContent = isMatch ? 'In list' : 'Not in list';
+  els.resultValue.textContent = code;
+
+  scanHistory.unshift({ code, match: isMatch, at: Date.now() });
+  renderHistory();
+  updateCounts();
+  saveHistory();
+}
+
+function sheetCsvUrlFrom(input) {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  // Already a direct export/gviz CSV url
+  if (/\/export\?format=csv|gviz\/tq\?tqx=out:csv/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const idMatch = trimmed.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  if (!idMatch) return null;
+  const sheetId = idMatch[1];
+
+  const gidMatch = trimmed.match(/[#&]gid=([0-9]+)/);
+  const gid = gidMatch ? gidMatch[1] : '0';
+
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+}
+
+function parseCsv(text) {
+  // Minimal CSV parser: handles quoted fields, commas and newlines within quotes.
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c === '\r') { /* skip */ }
+      else field += c;
+    }
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+async function loadFromSheet() {
+  const csvUrl = sheetCsvUrlFrom(els.sheetUrl.value);
+  if (!csvUrl) {
+    els.sheetStatus.textContent = 'That doesn\'t look like a valid Google Sheet URL.';
+    return;
+  }
+
+  els.sheetStatus.textContent = 'Loading…';
+  els.sheetLoadBtn.disabled = true;
+
+  try {
+    const res = await fetch(csvUrl);
+    if (!res.ok) throw new Error('fetch failed');
+    const text = await res.text();
+
+    // Google returns an HTML login page (not CSV) for private sheets.
+    if (/^\s*<!DOCTYPE html/i.test(text) || /<html/i.test(text.slice(0, 200))) {
+      throw new Error('not-public');
+    }
+
+    const rows = parseCsv(text).filter(r => r.length > 0 && r.some(c => c.trim() !== ''));
+    let dataRows = rows;
+    if (els.skipHeader.checked && dataRows.length > 0) {
+      dataRows = dataRows.slice(1);
+    }
+
+    const codes = dataRows
+      .map(r => (r[0] || '').trim())
+      .filter(c => c.length > 0);
+
+    if (codes.length === 0) {
+      els.sheetStatus.textContent = 'Loaded the sheet but found no codes in column A.';
+      els.sheetLoadBtn.disabled = false;
+      return;
+    }
+
+    validCodes = codes;
+    els.listInput.value = codes.join('\n');
+    await window.storage.set('qr-valid-codes', JSON.stringify(codes));
+    await window.storage.set('qr-sheet-url', els.sheetUrl.value.trim());
+    updateCounts();
+    els.sheetStatus.textContent = `Loaded ${codes.length} code${codes.length === 1 ? '' : 's'}.`;
+  } catch (e) {
+    els.sheetStatus.textContent =
+      'Could not load the sheet. Make sure it\'s shared as "Anyone with the link — Viewer".';
+  } finally {
+    els.sheetLoadBtn.disabled = false;
+  }
+}
+
+function onScanSuccess(decodedText) {
+  const now = Date.now();
+  if (now - lastResultAt < 1500) return; // debounce repeat reads of the same code
+  lastResultAt = now;
+  showResult(decodedText);
+}
+
+async function startScanning() {
+  els.idleState.style.display = 'none';
+  els.scanFrame.style.display = 'block';
+  els.startBtn.style.display = 'none';
+  els.stopBtn.style.display = 'block';
+
+  html5QrCode = new Html5Qrcode('reader');
+  try {
+    await html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 220, height: 220 } },
+      onScanSuccess,
+      () => {}
+    );
+    scanning = true;
+  } catch (err) {
+    els.idleState.style.display = 'flex';
+    els.idleState.querySelector('span').textContent =
+      'Camera access failed. Check your browser permissions and try again.';
+    els.scanFrame.style.display = 'none';
+    els.startBtn.style.display = 'block';
+    els.stopBtn.style.display = 'none';
+  }
+}
+
+async function stopScanning() {
+  if (html5QrCode && scanning) {
+    try {
+      await html5QrCode.stop();
+      await html5QrCode.clear();
+    } catch (e) {}
+  }
+  scanning = false;
+  els.idleState.style.display = 'flex';
+  els.idleState.querySelector('span').textContent =
+    'Camera is off. Start scanning to check a code against your list.';
+  els.scanFrame.style.display = 'none';
+  els.startBtn.style.display = 'block';
+  els.stopBtn.style.display = 'none';
+}
+
+els.startBtn.addEventListener('click', startScanning);
+els.stopBtn.addEventListener('click', stopScanning);
+els.saveBtn.addEventListener('click', saveList);
+els.sheetLoadBtn.addEventListener('click', loadFromSheet);
+
+loadList();
+</script>
+
+</body>
+</html>
