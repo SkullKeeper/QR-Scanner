@@ -370,9 +370,101 @@
         color: var(--muted);
         padding: 4px 0;
       }
+      .flash-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
+
+      .flash-overlay.show {
+        opacity: 1;
+      }
+
+      .flash-overlay.match {
+        background: var(--green);
+      }
+
+      .flash-overlay.no-match {
+        background: var(--red);
+      }
+
+      #flash-icon {
+        transform: scale(0.4);
+        opacity: 0;
+      }
+
+      .flash-overlay.show #flash-icon {
+        animation: flash-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+
+      @keyframes flash-pop {
+        0% {
+          transform: scale(0.4);
+          opacity: 0;
+        }
+        60% {
+          transform: scale(1.12);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
     </style>
   </head>
   <body>
+    <div class="flash-overlay" id="flash-overlay">
+      <svg id="flash-icon" viewBox="0 0 100 100" width="140" height="140">
+        <circle
+          id="flash-ring"
+          cx="50"
+          cy="50"
+          r="42"
+          fill="none"
+          stroke="white"
+          stroke-width="5"
+          opacity="0.85"
+        />
+        <path
+          id="flash-check"
+          d="M28 52 L44 68 L74 34"
+          fill="none"
+          stroke="white"
+          stroke-width="7"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          style="display: none"
+        />
+        <g id="flash-x" style="display: none">
+          <line
+            x1="32"
+            y1="32"
+            x2="68"
+            y2="68"
+            stroke="white"
+            stroke-width="7"
+            stroke-linecap="round"
+          />
+          <line
+            x1="68"
+            y1="32"
+            x2="32"
+            y2="68"
+            stroke="white"
+            stroke-width="7"
+            stroke-linecap="round"
+          />
+        </g>
+      </svg>
+    </div>
+
     <div class="app">
       <header>
         <h1>QR Check</h1>
@@ -613,10 +705,35 @@
         els.resultLabel.textContent = isMatch ? "In list" : "Not in list";
         els.resultValue.textContent = code;
 
+        triggerFlash(isMatch);
+
         scanHistory.unshift({ code, match: isMatch, at: Date.now() });
         renderHistory();
         updateCounts();
         saveHistory();
+      }
+
+      let flashTimeout = null;
+
+      function triggerFlash(isMatch) {
+        const overlay = document.getElementById("flash-overlay");
+        const checkEl = document.getElementById("flash-check");
+        const xEl = document.getElementById("flash-x");
+
+        clearTimeout(flashTimeout);
+
+        overlay.classList.remove("match", "no-match", "show");
+        // Force reflow so the animation restarts even on consecutive same-result scans.
+        void overlay.offsetWidth;
+
+        checkEl.style.display = isMatch ? "block" : "none";
+        xEl.style.display = isMatch ? "none" : "block";
+
+        overlay.classList.add(isMatch ? "match" : "no-match", "show");
+
+        flashTimeout = setTimeout(() => {
+          overlay.classList.remove("show");
+        }, 1000);
       }
 
       function sheetCsvUrlFrom(input, tabName) {
