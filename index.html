@@ -284,9 +284,7 @@
         gap: 10px;
       }
 
-      #sheet-url,
-      #column-header,
-      #tab-name {
+      #sheet-url {
         width: 100%;
         background: var(--panel-raised);
         border: 1px solid var(--border);
@@ -297,9 +295,7 @@
         padding: 11px 12px;
       }
 
-      #sheet-url::placeholder,
-      #column-header::placeholder,
-      #tab-name::placeholder {
+      #sheet-url::placeholder {
         color: var(--muted);
       }
 
@@ -432,29 +428,14 @@
           <div class="sheet-source">
             <p class="list-hint">
               Load from a Google Sheet: File &rarr; Share &rarr; "Anyone with
-              the link" (Viewer), then paste the sheet URL below.
+              the link" (Viewer), then paste the sheet URL below. Reads the
+              "Unique ID" column from the "Form Responses 1" tab, and saves
+              automatically.
             </p>
             <input
               type="text"
               id="sheet-url"
               placeholder="https://docs.google.com/spreadsheets/d/..."
-            />
-            <label class="field-label" for="tab-name"
-              >Sheet/tab name (as shown at the bottom of Google Sheets)</label
-            >
-            <input
-              type="text"
-              id="tab-name"
-              placeholder="e.g. Form Responses 1"
-            />
-            <label class="field-label" for="column-header"
-              >Column header to match on</label
-            >
-            <input
-              type="text"
-              id="column-header"
-              placeholder="Unique ID"
-              value="Unique ID"
             />
             <div class="save-row">
               <button class="btn-save" id="sheet-load-btn">
@@ -499,6 +480,9 @@
       let scanning = false;
       let lastResultAt = 0;
 
+      const SHEET_TAB_NAME = "Form Responses 1";
+      const SHEET_COLUMN_HEADER = "Unique ID";
+
       const els = {
         startBtn: document.getElementById("start-btn"),
         stopBtn: document.getElementById("stop-btn"),
@@ -511,8 +495,6 @@
         saveBtn: document.getElementById("save-btn"),
         saveStatus: document.getElementById("save-status"),
         sheetUrl: document.getElementById("sheet-url"),
-        tabName: document.getElementById("tab-name"),
-        columnHeader: document.getElementById("column-header"),
         sheetLoadBtn: document.getElementById("sheet-load-btn"),
         sheetStatus: document.getElementById("sheet-status"),
         listStatus: document.getElementById("list-status"),
@@ -590,22 +572,6 @@
           }
         } catch (e) {
           // no saved sheet url yet
-        }
-        try {
-          const res = await window.storage.get("qr-sheet-column");
-          if (res && res.value) {
-            els.columnHeader.value = res.value;
-          }
-        } catch (e) {
-          // no saved column preference yet
-        }
-        try {
-          const res = await window.storage.get("qr-sheet-tab");
-          if (res && res.value) {
-            els.tabName.value = res.value;
-          }
-        } catch (e) {
-          // no saved tab name yet
         }
         updateCounts();
       }
@@ -722,7 +688,7 @@
       }
 
       async function loadFromSheet() {
-        const csvUrl = sheetCsvUrlFrom(els.sheetUrl.value, els.tabName.value);
+        const csvUrl = sheetCsvUrlFrom(els.sheetUrl.value, SHEET_TAB_NAME);
         if (!csvUrl) {
           els.sheetStatus.textContent =
             "That doesn't look like a valid Google Sheet URL.";
@@ -755,7 +721,7 @@
           }
 
           const headerRow = rows[0].map((h) => h.trim());
-          const wantedHeader = (els.columnHeader.value || "Unique ID").trim();
+          const wantedHeader = SHEET_COLUMN_HEADER;
           const colIndex = headerRow.findIndex(
             (h) => h.toLowerCase() === wantedHeader.toLowerCase(),
           );
@@ -782,10 +748,8 @@
           els.listInput.value = codes.join("\n");
           await window.storage.set("qr-valid-codes", JSON.stringify(codes));
           await window.storage.set("qr-sheet-url", els.sheetUrl.value.trim());
-          await window.storage.set("qr-sheet-column", wantedHeader);
-          await window.storage.set("qr-sheet-tab", els.tabName.value.trim());
           updateCounts();
-          els.sheetStatus.textContent = `Loaded ${codes.length} code${codes.length === 1 ? "" : "s"} from "${wantedHeader}".`;
+          els.sheetStatus.textContent = `Loaded and saved ${codes.length} code${codes.length === 1 ? "" : "s"} from "${wantedHeader}".`;
         } catch (e) {
           els.sheetStatus.textContent =
             'Could not load the sheet. Make sure it\'s shared as "Anyone with the link — Viewer", and that the tab name (if set) matches exactly.';
